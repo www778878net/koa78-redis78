@@ -9,19 +9,20 @@ class Redis78 {
     constructor(config) {
         this._pool = null;
         this.local = ""; //���ݵص㻮��
+        this.host = ""; //redis������
         if (!config)
             return;
         //host: string, pwd: string, local: string, max ?: number
         let port = config["port"] || 6379;
         let max = config["max"] || 100;
-        let host = config["host"] || "127.0.0.1";
-        if (host == "")
+        this.host = config["host"] || "127.0.0.1";
+        if (this.host == "")
             return;
         this.local = config["local"] || "";
         let pwd = config["pwd"] || "";
         //�ò������ӳ� һ�þͱ���
         //this.client=new MemCache(host+':'+port, {poolSize:500,reconnect:1000,retry:1000});
-        //let self = this;
+        let self = this;
         this._pool = genericPool.createPool({
             create: function () {
                 //let client = redis.createClient(port, host);
@@ -31,13 +32,13 @@ class Redis78 {
                 if (pwd)
                     client = new Redis({
                         port: port,
-                        host: host,
+                        host: self.host,
                         family: 4,
                         password: pwd,
                         db: 0
                     });
                 else
-                    client = new Redis(port, host);
+                    client = new Redis(port, self.host);
                 return client;
             },
             destroy: function (client) {

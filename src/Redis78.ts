@@ -5,7 +5,8 @@ const genericPool = require('generic-pool');
 //redis 应注意清除多余元素
 export default class Redis78 {
     _pool: any=null;
-    local: string="";//根据地点划分
+    local: string = "";//根据地点划分
+    host: string = "";//redis服务器
 
     constructor(config: {}) {
         if (!config)
@@ -13,13 +14,13 @@ export default class Redis78 {
         //host: string, pwd: string, local: string, max ?: number
         let port = config["port"] || 6379;
         let max = config["max"] || 100;
-        let host = config["host"] || "127.0.0.1"; 
-        if (host == "") return;
+        this.host = config["host"] || "127.0.0.1"; 
+        if (this.host == "") return;
         this.local = config["local"] || "";
         let pwd = config["pwd"] || ""
         //用不了连接池 一用就报错
         //this.client=new MemCache(host+':'+port, {poolSize:500,reconnect:1000,retry:1000});
-        //let self = this;
+        let self = this;
         this._pool = genericPool.createPool({
             create: function () {
 
@@ -30,13 +31,13 @@ export default class Redis78 {
                 if (pwd)
                     client = new Redis({
                         port: port,          // Redis port
-                        host: host,   // Redis host
+                        host: self.host,   // Redis host
                         family: 4,           // 4 (IPv4) or 6 (IPv6)
                         password: pwd,
                         db: 0
                     })
                 else
-                    client = new Redis(port, host);
+                    client = new Redis(port, self.host);
 
                 return client;
 
