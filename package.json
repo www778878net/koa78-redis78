@@ -1,6 +1,6 @@
 {
   "name": "@www778878net/redis78",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "koa78 redis78",
   "main": "dist/index.js",
   "types": "src/index.ts",
