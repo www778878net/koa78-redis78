@@ -25,7 +25,7 @@ describe('test null ', () => {
     it(' return anything', async() => {
         let testclient = new Redis78(null)
         let reback= await testclient.set("test", 1, 20) 
-        expect(reback).to.equal("pool null");
+        expect(reback).to.equal("");
         //no catch err
         //const result = 1;
         //expect(result).to.equal(1);
