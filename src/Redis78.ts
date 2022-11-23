@@ -66,7 +66,7 @@ export default class Redis78 {
         var self = this;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -79,7 +79,7 @@ export default class Redis78 {
         var self = this;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.release(pipe.redis);
@@ -91,7 +91,7 @@ export default class Redis78 {
         var self = this;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -104,7 +104,7 @@ export default class Redis78 {
         var self = this;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.release(client);
@@ -123,7 +123,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -157,7 +157,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -182,7 +182,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -212,7 +212,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -240,7 +240,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -269,7 +269,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -298,7 +298,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -329,7 +329,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -352,7 +352,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -380,7 +380,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -408,7 +408,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -436,7 +436,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -464,7 +464,7 @@ export default class Redis78 {
         key += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -494,7 +494,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -522,7 +522,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -550,7 +550,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -578,7 +578,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -604,7 +604,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
@@ -631,7 +631,7 @@ export default class Redis78 {
         name += self.local;
         return new Promise((resolve, reject) => {
             if (self._pool == null) {
-                resolve("pool null")
+                resolve("")
                 return;
             }
             self._pool.acquire().then(function (client) {
