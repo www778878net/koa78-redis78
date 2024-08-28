@@ -1,5 +1,5 @@
 {
-  "name": "@www778878net/redis78",
+  "name": "redis78",
   "version": "0.1.2",
   "description": "koa78 redis78",
   "main": "dist/index.js",
