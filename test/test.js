@@ -6,7 +6,8 @@ var fs = require('fs');
 console.log(process.argv)
 var fspath = process.argv[3]
 var config = loadjson(fspath);
-console.log(config)
+console.log('????:', JSON.stringify(config, null, 2));
+
 function loadjson(filepath) {
     var data;
     try {
@@ -18,20 +19,19 @@ function loadjson(filepath) {
     }
     return data;
 }
-console.log(Redis78)
-let redis = new Redis78(config["redis"]);
-console.log(redis)
+
+console.log('Redis78?:', Redis78);
+let redis = new Redis78(config);  // ?????? config ??
+console.log('Redis??:', redis);
+
 describe('test null ', () => {
     it(' return anything', async() => {
         let testclient = new Redis78(null)
         let reback= await testclient.set("test", 1, 20) 
         expect(reback).to.equal("");
-        //no catch err
-        //const result = 1;
-        //expect(result).to.equal(1);
-        //done(); // Í¨ÖªMocha²âÊÔ½áÊø
     });
 });
+
 describe('test set  ', () => {
     it(' return true',async () => { 
         let result = await redis.set("testitem", 8, 60) 
@@ -46,15 +46,10 @@ describe('test get  ', () => {
     });
 }); 
 
- 
-
 describe('test del  ', () => {
     it(' return true',async () => {
         let result = await redis.del("testitem")
-        expect(result).to.equal(1) ;
+        expect(result).to.equal(1);
     });
 }); 
 
- 
-
- 

@@ -1,22 +1,7 @@
 {
-  "mysql": {
-    "host": "192.168.31.77",
-    "port": "3300",
-    "password": "7788test",
-    "database": "testdb",
-    "user": "7788test"
-  },
-  "memcached": {
-    "host": "192.168.31.77",
-    "port": 11211,
-    "max": 100,
-    "local": ""
-  },
-  "redis": {
     "host": "192.168.31.101",
     "port": 6379,
     "pwd": "www778878net",
     "max": 100,
     "local": "local"
-  }
 }
