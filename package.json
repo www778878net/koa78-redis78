@@ -3,7 +3,7 @@
   "version": "0.1.3",
   "description": "koa78 redis78",
   "main": "dist/index.js",
-  "types": "src/index.ts",
+  "types": "dist/types/index.d.ts",
   "author": {
     "name": "Frieda.Hu<657225485@qq.com>"
   },
