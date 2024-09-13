@@ -1,4 +1,5 @@
 console.log('开始编译过程...');
+console.log('正在清理 dist 目录...');
 console.log('正在导出类型...');
 
 import Redis78 from "./Redis78";
