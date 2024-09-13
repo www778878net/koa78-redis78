@@ -31,9 +31,9 @@ class Redis78 {
                 let client;
                 if (pwd)
                     client = new Redis({
-                        port: port,
-                        host: self.host,
-                        family: 4,
+                        port: port, // Redis port
+                        host: self.host, // Redis host
+                        family: 4, // 4 (IPv4) or 6 (IPv6)
                         password: pwd,
                         db: 0
                     });
