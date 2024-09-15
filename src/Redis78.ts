@@ -1,651 +1,395 @@
-const Util = require('util');
-const Redis = require('ioredis');
-const Pool = require('generic-pool').Pool;
-const genericPool = require('generic-pool');
-//redis 应注意清除多余元素
+import Redis, { Pipeline } from 'ioredis';
+import { Pool, createPool } from 'generic-pool';
+
+interface Redis78Config {
+    port?: number;
+    max?: number;
+    host?: string;
+    local?: string;
+    pwd?: string;
+}
+
 export default class Redis78 {
-    _pool: any=null;
-    local: string = "";//根据地点划分
-    host: string = "";//redis服务器
+    private _pool: Pool<Redis> | null = null;
+    private local: string = "";
+    private host: string = "";
 
-    constructor(config: {}) {
-        if (!config)
+    constructor(config: Redis78Config | null = {}) {
+        if (config === null) {
+            console.warn("Null config provided. Redis78 instance may not function correctly.");
             return;
-        //host: string, pwd: string, local: string, max ?: number
-        let port = config["port"] || 6379;
-        let max = config["max"] || 100;
-        this.host = config["host"] || "127.0.0.1"; 
-        if (this.host == "") return;
-        this.local = config["local"] || "";
-        let pwd = config["pwd"] || ""
-        //用不了连接池 一用就报错
-        //this.client=new MemCache(host+':'+port, {poolSize:500,reconnect:1000,retry:1000});
-        let self = this;
-        this._pool = genericPool.createPool({
-            create: function () {
+        }
 
-                //let client = redis.createClient(port, host);
-                //if(pwd!="")
-                //client.auth(pwd);
-                let client;
-                if (pwd)
+        const port = config.port ?? 6379;
+        const max = config.max ?? 100;
+        this.host = config.host ?? "127.0.0.1";
+        this.local = config.local ?? "";
+        const pwd = config.pwd ?? "";
+
+        this._pool = createPool({
+            create: async () => {
+                let client: Redis;
+                if (pwd) {
                     client = new Redis({
-                        port: port,          // Redis port
-                        host: self.host,   // Redis host
-                        family: 4,           // 4 (IPv4) or 6 (IPv6)
+                        port,
+                        host: this.host,
+                        family: 4,
                         password: pwd,
                         db: 0
-                    })
-                else
-                    client = new Redis(port, self.host);
-
+                    });
+                } else {
+                    client = new Redis(port, this.host);
+                }
                 return client;
-
             },
-            destroy: function (client) {
-
-                //if (client.connected) {
+            destroy: async (client: Redis) => {
                 try {
-                    client.quit();
+                    await client.quit();
+                } catch (err) {
+                    console.log('Failed to close redis connection: ' + err);
                 }
-                catch (err) {
-                    console.log('Failed to redis connection: ' + err);
-                }
-                //}
             }
         }, {
-            max: max,
+            max,
             min: 10,
             idleTimeoutMillis: 3000
         });
-
-
     }
 
-    pipeGet(): any {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                resolve(client.pipeline());
-            })
-        });
-    }
-    //测试行不行
-    pipeRelase(pipe: any): Promise<string> {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.release(pipe.redis);
-            resolve("OK");
-        })
+    async pipeGet(): Promise<any | null> {
+        if (!this._pool) return null;
+        const client = await this._pool.acquire();
+        return client.pipeline();
     }
 
-    clientGet(): any {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                resolve(client);
-            })
-        });
+    async pipeRelase(pipe: any): Promise<string> {
+        if (!this._pool) return "";
+        if (pipe.redis instanceof Redis) {
+            await this._pool.release(pipe.redis);
+        } else {
+            console.error('Unexpected redis instance type in pipeline');
+        }
+        return "OK";
     }
 
-    clientRelase(client: any): Promise<string> {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.release(client);
-            resolve("OK");
-        })
+    async clientGet(): Promise<Redis | null> {
+        if (!this._pool) return null;
+        return await this._pool.acquire();
     }
 
-
-
-    /**
-     * 这个会很慢，有坑
-     * 
-    */
-    ltrim(key: string, start: number, end: number): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.ltrim(key, start, end, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis ltrim Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
-
+    async clientRelase(client: Redis): Promise<string> {
+        if (!this._pool) return "";
+        await this._pool.release(client);
+        return "OK";
     }
 
+    async ltrim(key: string, start: number, end: number): Promise<string> {
+        key += this.local;
+        if (!this._pool) return "";
 
-
-
-    /**
-     * 
-     * @param key
-     * @param value
-     * @param sec -1为永久(尽量不要放永久)
-     */
-    set(key: string, value: string | number, sec?: number): any {
-        sec = sec || 86400;
-
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.set(key, value, (err, reply) => {
-                    if (sec != -1)
-                        client.expire(key, sec);
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
-    };
-
-    get(key: string, debug?: boolean): any {
-        debug = debug || false;
-        let self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.get(key, (err, reply: string) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis GetData Error: ' + err + key);
-                        return;
-                    }
-                    //qq云没有返回undef
-                    //if (reply == undefined) reply = null;
-                    //unde 和null都可以用!reply判断
-                    if (debug) {
-                        console.log("redis get:" + key + " value:" + reply);
-                    }
-                    resolve(reply);
-                });
-            });
-
-        });
-    };
-
-    del(key: string): any {
-
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.del(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis GetData Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.ltrim(key, start, end);
+            return reply;
+        } catch (err) {
+            console.error('redis ltrim Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-    * redis list
-    * @param key
-    * @param value
-    */
-    llen(key: string): any {
+    async set(key: string, value: string | number, sec: number = 86400): Promise<string> {
+        key += this.local;
+        if (!this._pool) return "";
 
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.set(key, value);
+            if (sec !== -1) {
+                await client.expire(key, sec);
             }
-            self._pool.acquire().then(function (client) {
-                client.llen(key, (err, reply) => {
-
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis llen Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
-    };
-
-    /**
-    * redis list
-    * @param key
-    * @param value
-    */
-    sadd(key: string, value: any): any {
-
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.sadd(key, value, (err, reply) => {
-
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis rpush Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
-    };
-
-    /**
-     * redis list
-     * @param key
-     * @param value
-     */
-    rpush(key: string, value: any): any {
-
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.rpush(key, value, (err, reply) => {
-
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis rpush Error: ' + err + key + value);
-                        return;
-                    }
-
-
-                    resolve(reply);
-                });
-            })
-        });
-    };
-
-    /**
-     * redis list
-     * @param key
-     * @param value
-     */
-    lpush(key: string, value: string | number): any {
-
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.lpush(key, value, (err, reply) => {
-
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
-    };
-
-    lrange(key: string, start: number, end: number): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.lrange(key, start, end, (err, reply) => {
-
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
+            return reply;
+        } catch (err) {
+            console.error('redis SetData Error:', err, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-    * 
-    * @param key  redis list key
-    * 
-    */
-    lpop(key: string): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.lpop(key, (err, reply) => {
+    async get(key: string, debug: boolean = false): Promise<string | null> {
+        key += this.local;
+        if (!this._pool) return null;
 
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis lpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.get(key);
+            if (debug) {
+                console.log("redis get:", key, "value:", reply);
+            }
+            return reply;
+        } catch (err) {
+            console.error('redis GetData Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-    * 
-    * @param key  redis list key
-    * 
-    */
-    scard(key: string): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.scard(key, (err, reply) => {
+    async del(key: string): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
 
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.del(key);
+            return reply;
+        } catch (err) {
+            console.error('redis DelData Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-    * 
-    * @param key  redis list key
-    * 
-    */
-    spop(key: string): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.spop(key, (err, reply) => {
+    async llen(key: string): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
 
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.llen(key);
+            return reply;
+        } catch (err) {
+            console.error('redis llen Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-     * 
-     * @param key  redis list key
-     * 
-     */
-    rpop(key: string): any {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.rpop(key, (err, reply) => {
+    async sadd(key: string, value: any): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
 
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            })
-        });
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.sadd(key, value);
+            return reply;
+        } catch (err) {
+            console.error('redis sadd Error:', err, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
+    async rpush(key: string, value: any): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
 
-    /**
-     *  设置有序集合
-     * @param name  有序集合的名称
-     * @param value 有序集合的值
-     * @param key   有序集合的key
-     */
-    zadd(name: string, value: number, key: string): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zadd(name, value, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis zadd Error: ' + err + name + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.rpush(key, value);
+            return reply;
+        } catch (err) {
+            console.error('redis rpush Error:', err, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-     *  给有序集合指定成员的分数加上增量
-     * @param name  有序集合的名称
-     * @param value 有序集合的值
-     * @param key   有序集合的key
-     */
-    zincrby(name: string, value: number, key: string): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zincrby(name, value, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+    async lpush(key: string, value: string | number): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.lpush(key, value);
+            return reply;
+        } catch (err) {
+            console.error('redis lpush Error:', err, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-     *  获取有序集合的key,value  value递增
-     * @param name  有序集合名称
-     * @param start 有序集合开始
-     * @param end   有序集合结束
-     */
-    zrange(name: string, start: number, end: number): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zrange(name, start, end, 'withscores', (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+    async lrange(key: string, start: number, end: number): Promise<string[]> {
+        key += this.local;
+        if (!this._pool) return [];
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.lrange(key, start, end);
+            return reply;
+        } catch (err) {
+            console.error('redis lrange Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-     *  获取有序集合的key,value    value递减
-     * @param name  有序集合名称
-     * @param start 有序集合开始
-     * @param end   有序集合结束
-     */
-    zrevrange(name: string, start: number, end: number): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zrevrange(name, start, end, 'withscores', (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
-    }
-    /**
-     * 用name,key获取集合的值
-     * @param name 集合的名称  
-     * @param key  集合的key
-     */
-    zscore(name: string, key: string): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zscore(name, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+    async lpop(key: string): Promise<string | null> {
+        key += this.local;
+        if (!this._pool) return null;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.lpop(key);
+            return reply;
+        } catch (err) {
+            console.error('redis lpop Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
-    /**
-     *  删除有序集合
-     * @param name  有序集合名称
-     * @param key   有序集合的key
-     */
-    zrem(name: string, key: string): any {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("")
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                client.zrem(name, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key);
-                        return;
-                    }
-                    resolve(reply);
-                })
-            })
-        })
+    async scard(key: string): Promise<number> {
+        key += this.local;
+        if (!this._pool) return 0;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.scard(key);
+            return reply;
+        } catch (err) {
+            console.error('redis scard Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
     }
 
+    async spop(key: string): Promise<string | null> {
+        key += this.local;
+        if (!this._pool) return null;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.spop(key);
+            return reply;
+        } catch (err) {
+            console.error('redis spop Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async rpop(key: string): Promise<string | null> {
+        key += this.local;
+        if (!this._pool) return null;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.rpop(key);
+            return reply;
+        } catch (err) {
+            console.error('redis rpop Error:', err, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zadd(name: string, value: number, key: string): Promise<number> {
+        name += this.local;
+        if (!this._pool) return 0;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zadd(name, value, key);
+            return reply;
+        } catch (err) {
+            console.error('redis zadd Error:', err, name, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zincrby(name: string, value: number, key: string): Promise<number> {
+        name += this.local;
+        if (!this._pool) return 0;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zincrby(name, value, key);
+            return parseFloat(reply);
+        } catch (err) {
+            console.error('redis zincrby Error:', err, name, key, value);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zrange(name: string, start: number, end: number): Promise<Array<string | number>> {
+        name += this.local;
+        if (!this._pool) return [];
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zrange(name, start, end, 'WITHSCORES');
+            return reply;
+        } catch (err) {
+            console.error('redis zrange Error:', err, name);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zrevrange(name: string, start: number, end: number): Promise<Array<string | number>> {
+        name += this.local;
+        if (!this._pool) return [];
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zrevrange(name, start, end, 'WITHSCORES');
+            return reply;
+        } catch (err) {
+            console.error('redis zrevrange Error:', err, name);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zscore(name: string, key: string): Promise<string | null> {
+        name += this.local;
+        if (!this._pool) return null;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zscore(name, key);
+            return reply;
+        } catch (err) {
+            console.error('redis zscore Error:', err, name, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
+
+    async zrem(name: string, key: string): Promise<number> {
+        name += this.local;
+        if (!this._pool) return 0;
+
+        const client = await this._pool.acquire();
+        try {
+            const reply = await client.zrem(name, key);
+            return reply;
+        } catch (err) {
+            console.error('redis zrem Error:', err, name, key);
+            throw err;
+        } finally {
+            await this._pool.release(client);
+        }
+    }
 }

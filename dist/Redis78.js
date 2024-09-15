@@ -1,606 +1,463 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const Util = require('util');
-const Redis = require('ioredis');
-const Pool = require('generic-pool').Pool;
-const genericPool = require('generic-pool');
-//redis Ӧע���������Ԫ��
+const ioredis_1 = require("ioredis");
+const generic_pool_1 = require("generic-pool");
 class Redis78 {
-    constructor(config) {
+    constructor(config = {}) {
+        var _a, _b, _c, _d, _e;
         this._pool = null;
-        this.local = ""; //���ݵص㻮��
-        this.host = ""; //redis������
-        if (!config)
+        this.local = "";
+        this.host = "";
+        if (config === null) {
+            console.warn("Null config provided. Redis78 instance may not function correctly.");
             return;
-        //host: string, pwd: string, local: string, max ?: number
-        let port = config["port"] || 6379;
-        let max = config["max"] || 100;
-        this.host = config["host"] || "127.0.0.1";
-        if (this.host == "")
-            return;
-        this.local = config["local"] || "";
-        let pwd = config["pwd"] || "";
-        //�ò������ӳ� һ�þͱ���
-        //this.client=new MemCache(host+':'+port, {poolSize:500,reconnect:1000,retry:1000});
-        let self = this;
-        this._pool = genericPool.createPool({
-            create: function () {
-                //let client = redis.createClient(port, host);
-                //if(pwd!="")
-                //client.auth(pwd);
+        }
+        const port = (_a = config.port) !== null && _a !== void 0 ? _a : 6379;
+        const max = (_b = config.max) !== null && _b !== void 0 ? _b : 100;
+        this.host = (_c = config.host) !== null && _c !== void 0 ? _c : "127.0.0.1";
+        this.local = (_d = config.local) !== null && _d !== void 0 ? _d : "";
+        const pwd = (_e = config.pwd) !== null && _e !== void 0 ? _e : "";
+        this._pool = (0, generic_pool_1.createPool)({
+            create: () => __awaiter(this, void 0, void 0, function* () {
                 let client;
-                if (pwd)
-                    client = new Redis({
-                        port: port,
-                        host: self.host,
+                if (pwd) {
+                    client = new ioredis_1.default({
+                        port,
+                        host: this.host,
                         family: 4,
                         password: pwd,
                         db: 0
                     });
-                else
-                    client = new Redis(port, self.host);
+                }
+                else {
+                    client = new ioredis_1.default(port, this.host);
+                }
                 return client;
-            },
-            destroy: function (client) {
-                //if (client.connected) {
+            }),
+            destroy: (client) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    client.quit();
+                    yield client.quit();
                 }
                 catch (err) {
-                    console.log('Failed to redis connection: ' + err);
+                    console.log('Failed to close redis connection: ' + err);
                 }
-                //}
-            }
+            })
         }, {
-            max: max,
+            max,
             min: 10,
             idleTimeoutMillis: 3000
         });
     }
     pipeGet() {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                resolve(client.pipeline());
-            });
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            return client.pipeline();
         });
     }
-    //�����в���
     pipeRelase(pipe) {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._pool)
+                return "";
+            if (pipe.redis instanceof ioredis_1.default) {
+                yield this._pool.release(pipe.redis);
             }
-            self._pool.release(pipe.redis);
-            resolve("OK");
+            else {
+                console.error('Unexpected redis instance type in pipeline');
+            }
+            return "OK";
         });
     }
     clientGet() {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
-            }
-            self._pool.acquire().then(function (client) {
-                resolve(client);
-            });
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._pool)
+                return null;
+            return yield this._pool.acquire();
         });
     }
     clientRelase(client) {
-        var self = this;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
-            }
-            self._pool.release(client);
-            resolve("OK");
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._pool)
+                return "";
+            yield this._pool.release(client);
+            return "OK";
         });
     }
-    /**
-     * �����������п�
-     *
-    */
     ltrim(key, start, end) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return "";
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.ltrim(key, start, end);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.ltrim(key, start, end, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis ltrim Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis ltrim Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *
-     * @param key
-     * @param value
-     * @param sec -1Ϊ����(������Ҫ������)
-     */
-    set(key, value, sec) {
-        sec = sec || 86400;
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+    set(key, value, sec = 86400) {
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return "";
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.set(key, value);
+                if (sec !== -1) {
+                    yield client.expire(key, sec);
+                }
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.set(key, value, (err, reply) => {
-                    if (sec != -1)
-                        client.expire(key, sec);
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis SetData Error:', err, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
-    get(key, debug) {
-        debug = debug || false;
-        let self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+    get(key, debug = false) {
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.get(key);
+                if (debug) {
+                    console.log("redis get:", key, "value:", reply);
+                }
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.get(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis GetData Error: ' + err + key);
-                        return;
-                    }
-                    //qq��û�з���undef
-                    //if (reply == undefined) reply = null;
-                    //unde ��null��������!reply�ж�
-                    if (debug) {
-                        console.log("redis get:" + key + " value:" + reply);
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis GetData Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
     del(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.del(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.del(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis GetData Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis DelData Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-    * redis list
-    * @param key
-    * @param value
-    */
     llen(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.llen(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.llen(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis llen Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis llen Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
-    /**
-    * redis list
-    * @param key
-    * @param value
-    */
     sadd(key, value) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.sadd(key, value);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.sadd(key, value, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis rpush Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis sadd Error:', err, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
-    /**
-     * redis list
-     * @param key
-     * @param value
-     */
     rpush(key, value) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.rpush(key, value);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.rpush(key, value, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis rpush Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis rpush Error:', err, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
-    /**
-     * redis list
-     * @param key
-     * @param value
-     */
     lpush(key, value) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.lpush(key, value);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.lpush(key, value, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis lpush Error:', err, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    ;
     lrange(key, start, end) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return [];
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.lrange(key, start, end);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.lrange(key, start, end, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis lrange Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-    *
-    * @param key  redis list key
-    *
-    */
     lpop(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.lpop(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.lpop(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis lpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis lpop Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-    *
-    * @param key  redis list key
-    *
-    */
     scard(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.scard(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.scard(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis scard Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-    *
-    * @param key  redis list key
-    *
-    */
     spop(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.spop(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.spop(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis spop Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *
-     * @param key  redis list key
-     *
-     */
     rpop(key) {
-        var self = this;
-        key += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            key += this.local;
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.rpop(key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.rpop(key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis delrpop Error: ' + err + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis rpop Error:', err, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *  �������򼯺�
-     * @param name  ���򼯺ϵ�����
-     * @param value ���򼯺ϵ�ֵ
-     * @param key   ���򼯺ϵ�key
-     */
     zadd(name, value, key) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zadd(name, value, key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.zadd(name, value, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis zadd Error: ' + err + name + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zadd Error:', err, name, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *  �����򼯺�ָ����Ա�ķ�����������
-     * @param name  ���򼯺ϵ�����
-     * @param value ���򼯺ϵ�ֵ
-     * @param key   ���򼯺ϵ�key
-     */
     zincrby(name, value, key) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zincrby(name, value, key);
+                return parseFloat(reply);
             }
-            self._pool.acquire().then(function (client) {
-                client.zincrby(name, value, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key + value);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zincrby Error:', err, name, key, value);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *  ��ȡ���򼯺ϵ�key,value  value����
-     * @param name  ���򼯺�����
-     * @param start ���򼯺Ͽ�ʼ
-     * @param end   ���򼯺Ͻ���
-     */
     zrange(name, start, end) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return [];
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zrange(name, start, end, 'WITHSCORES');
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.zrange(name, start, end, 'withscores', (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zrange Error:', err, name);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *  ��ȡ���򼯺ϵ�key,value    value�ݼ�
-     * @param name  ���򼯺�����
-     * @param start ���򼯺Ͽ�ʼ
-     * @param end   ���򼯺Ͻ���
-     */
     zrevrange(name, start, end) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return [];
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zrevrange(name, start, end, 'WITHSCORES');
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.zrevrange(name, start, end, 'withscores', (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zrevrange Error:', err, name);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     * ��name,key��ȡ���ϵ�ֵ
-     * @param name ���ϵ�����
-     * @param key  ���ϵ�key
-     */
     zscore(name, key) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return null;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zscore(name, key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.zscore(name, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zscore Error:', err, name, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
-    /**
-     *  ɾ�����򼯺�
-     * @param name  ���򼯺�����
-     * @param key   ���򼯺ϵ�key
-     */
     zrem(name, key) {
-        var self = this;
-        name += self.local;
-        return new Promise((resolve, reject) => {
-            if (self._pool == null) {
-                resolve("");
-                return;
+        return __awaiter(this, void 0, void 0, function* () {
+            name += this.local;
+            if (!this._pool)
+                return 0;
+            const client = yield this._pool.acquire();
+            try {
+                const reply = yield client.zrem(name, key);
+                return reply;
             }
-            self._pool.acquire().then(function (client) {
-                client.zrem(name, key, (err, reply) => {
-                    self._pool.release(client);
-                    if (err) {
-                        reject(err);
-                        console.error('redis SetData Error: ' + err + name + key);
-                        return;
-                    }
-                    resolve(reply);
-                });
-            });
+            catch (err) {
+                console.error('redis zrem Error:', err, name, key);
+                throw err;
+            }
+            finally {
+                yield this._pool.release(client);
+            }
         });
     }
 }
